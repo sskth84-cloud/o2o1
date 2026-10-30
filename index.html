@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="th"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Excel Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#eef3f2;--card:#fff;--ink:#14232b;--mut:#5d6b72;--ac:#0b7a75;--ac2:#e0662a;--line:#d6e0de;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1b20;--card:#16262d;--ink:#e8f0ee;--mut:#9fb0b5;--ac:#3cc5bb;--ac2:#ff8a4c;--line:#26393f}}
+:root[data-theme="dark"]{--bg:#0f1b20;--card:#16262d;--ink:#e8f0ee;--mut:#9fb0b5;--ac:#3cc5bb;--ac2:#ff8a4c;--line:#26393f}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans Thai',system-ui,sans-serif;line-height:1.5}
+header{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}
+h1{font-size:22px;margin:0}h2{font-size:18px;margin:0 0 12px}
+header p{margin:0;color:var(--mut);font-size:14px}
+.bar{display:flex;gap:8px;flex-wrap:wrap}
+.btn,select,button{font:inherit;font-size:15px;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:8px;padding:8px 14px;cursor:pointer}
+.pri{background:var(--ac);color:#fff;border-color:var(--ac);font-weight:600}
+:focus-visible{outline:3px solid var(--ac2);outline-offset:2px}
+main{max-width:1100px;margin:0 auto;padding:20px}
+.drop{border:2px dashed var(--ac);border-radius:12px;padding:48px 20px;text-align:center;font-size:18px}
+.drop small{display:block;color:var(--mut);font-size:14px;margin-top:8px}
+.drop.over{background:var(--card)}
+.flt{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}
+.flt label,.ctl label{font-size:14px;color:var(--mut);display:flex;flex-direction:column;gap:4px}
+.ctl{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.sec{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.k{border-left:4px solid var(--ac);padding:4px 12px}
+.k span{font-size:14px;color:var(--mut)}.k b{display:block;font-size:30px;line-height:1.2}
+.k:nth-child(even){border-color:var(--ac2)}
+.cv{position:relative;height:320px}
+#nav{position:fixed;left:0;right:0;bottom:0;display:flex;gap:12px;justify-content:center;align-items:center;padding:12px 12px calc(12px + env(safe-area-inset-bottom,0px));background:var(--card);border-top:1px solid var(--line);z-index:5}
+body.present .sec{display:none}
+body.present .sec.on{display:block;position:fixed;inset:0;padding:calc(24px + env(safe-area-inset-top,0px)) 24px 80px;border-radius:0;margin:0;overflow:auto;z-index:4;background:var(--bg)}
+body.present .cv{height:60vh}body.present .k b{font-size:44px}
+body.present header,body.present .flt{display:none}
+</style></head><body>
+<header><div><h1>Excel Dashboard</h1><p id="fn">อัปโหลดไฟล์ Excel หรือ CSV เพื่อสร้างแดชบอร์ด</p></div>
+<div class="bar"><select id="sh" hidden aria-label="เลือกชีต"></select>
+<label class="btn">เลือกไฟล์<input id="f" type="file" accept=".xlsx,.xls,.csv" hidden></label>
+<button id="pr" class="btn pri" hidden>นำเสนอ</button></div></header>
+<main>
+<div id="drop" class="drop">ลากไฟล์มาวางที่นี่ หรือกด เลือกไฟล์<small>ข้อมูลประมวลผลในเบราว์เซอร์ของคุณเท่านั้น ไม่ถูกส่งไปที่อื่น</small></div>
+<div id="app" hidden>
+<div id="flt" class="flt"></div>
+<section class="sec"><h2>ตัวชี้วัดหลัก</h2><div id="kpi" class="kpi"></div></section>
+<section class="sec"><h2>เปรียบเทียบตามกลุ่ม</h2><div class="ctl"><label>ตัวชี้วัด<select id="mt"></select></label><label>แยกตาม<select id="gp"></select></label></div><div class="cv"><canvas id="c1"></canvas></div></section>
+<section class="sec"><h2>สัดส่วน</h2><div class="cv"><canvas id="c2"></canvas></div></section>
+<section class="sec" id="s3"><h2>แนวโน้มรายเดือน</h2><div class="cv"><canvas id="c3"></canvas></div></section>
+</div></main>
+<div id="nav" hidden><button id="pv" aria-label="ก่อนหน้า">‹</button><span id="ct"></span><button id="nx" aria-label="ถัดไป">›</button><button id="ex">ออก</button></div>
+<script>
+var $=function(s){return document.querySelector(s)},wb,rows=[],C={num:[],cat:[],date:null},avg={},ch={},idx=0,fv={};
+function fmt(n,p){if(p)return(n*100).toFixed(1)+'%';var a=Math.abs(n);return a>=1e9?(n/1e9).toFixed(2)+'B':a>=1e6?(n/1e6).toFixed(2)+'M':a>=1e3?(n/1e3).toFixed(1)+'K':String(+n.toFixed(2))}
+function pct(c){return avg[c]&&rows.every(function(r){return typeof r[c]!=='number'||(r[c]>=0&&r[c]<=1)})}
+function load(file){var r=new FileReader();r.onload=function(e){try{wb=XLSX.read(e.target.result,{type:'array',cellDates:true});var s=$('#sh');s.innerHTML='';wb.SheetNames.forEach(function(n){s.add(new Option(n,n))});s.hidden=wb.SheetNames.length<2;$('#fn').textContent=file.name;pick(wb.SheetNames[0])}catch(x){alert('อ่านไฟล์ไม่ได้ กรุณาเลือกไฟล์ .xlsx หรือ .csv')}};r.readAsArrayBuffer(file)}
+function pick(n){rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{defval:null});C={num:[],cat:[],date:null};avg={};fv={};
+if(!rows.length){alert('ชีตนี้ไม่มีข้อมูล');return}
+Object.keys(rows[0]).forEach(function(k){var v=rows.map(function(r){return r[k]}).filter(function(x){return x!==null&&x!==''});if(!v.length)return;
+var nd=v.filter(function(x){return x instanceof Date}).length,nn=v.filter(function(x){return typeof x==='number'}).length;
+if(nd/v.length>.8){if(!C.date)C.date=k}else if(nn/v.length>.8){C.num.push(k);if(/%|rate|otif|ontime|infull|margin|อัตรา/i.test(k)||v.every(function(x){return typeof x!=='number'||(x>=0&&x<=1)}))avg[k]=1}
+else{var d=new Set(v).size;if(d<=40&&d<rows.length*.8)C.cat.push(k)}});
+if(!C.num.length||!C.cat.length){alert('ไม่พบคอลัมน์ตัวเลขหรือคอลัมน์กลุ่มที่ใช้ทำแดชบอร์ดได้');return}
+$('#drop').hidden=true;$('#app').hidden=false;$('#pr').hidden=false;
+var m=$('#mt'),g=$('#gp'),f=$('#flt');m.innerHTML=g.innerHTML=f.innerHTML='';
+C.num.forEach(function(k){m.add(new Option(k,k))});C.cat.forEach(function(k){g.add(new Option(k,k))});
+C.cat.slice(0,4).forEach(function(k){var l=document.createElement('label'),s=document.createElement('select');l.textContent=k;s.add(new Option('ทั้งหมด',''));
+Array.from(new Set(rows.map(function(r){return r[k]}).filter(function(x){return x!==null}))).sort().forEach(function(x){s.add(new Option(x,x))});
+s.onchange=function(){fv[k]=s.value;draw()};l.appendChild(s);f.appendChild(l)});
+$('#s3').hidden=!C.date;draw()}
+function agg(rs,k){var s=0,n=0;rs.forEach(function(r){if(typeof r[k]==='number'){s+=r[k];n++}});return avg[k]?(n?s/n:0):s}
+function mk(id,cfg){if(ch[id])ch[id].destroy();var cs=getComputedStyle(document.documentElement);cfg.options=Object.assign({responsive:true,maintainAspectRatio:false,animation:false},cfg.options||{});
+Chart.defaults.color=cs.getPropertyValue('--mut').trim();Chart.defaults.font.family="'IBM Plex Sans Thai',sans-serif";ch[id]=new Chart($(id),cfg)}
+function draw(){var rs=rows.filter(function(r){return Object.keys(fv).every(function(k){return !fv[k]||String(r[k])===fv[k]})}),cs=getComputedStyle(document.documentElement),a1=cs.getPropertyValue('--ac').trim(),a2=cs.getPropertyValue('--ac2').trim();
+var k=$('#kpi');k.innerHTML='';[['จำนวนแถว',rs.length.toLocaleString(),'']].concat(C.num.slice(0,5).map(function(c){return[(avg[c]?'เฉลี่ย ':'รวม ')+c,fmt(agg(rs,c),pct(c))]})).forEach(function(x){var d=document.createElement('div');d.className='k';var s=document.createElement('span'),b=document.createElement('b');s.textContent=x[0];b.textContent=x[1];d.append(s,b);k.appendChild(d)});
+var m=$('#mt').value,g=$('#gp').value,M={};rs.forEach(function(r){var q=String(r[g]);(M[q]=M[q]||[]).push(r)});
+var L=Object.keys(M).map(function(q){return[q,agg(M[q],m),M[q].length]}).sort(function(a,b){return b[1]-a[1]}),T=L.slice(0,12),p=pct(m);
+mk('#c1',{type:'bar',data:{labels:T.map(function(x){return x[0]}),datasets:[{label:m,data:T.map(function(x){return x[1]}),backgroundColor:a1,borderRadius:4}]},options:{plugins:{legend:{display:false}},scales:{y:{ticks:{callback:function(v){return fmt(v,p)}}}}}});
+var sh=avg[m]?L.map(function(x){return[x[0],x[2]]}):L,top=sh.slice(0,6),ot=sh.slice(6).reduce(function(s,x){return s+x[1]},0);if(ot>0)top.push(['อื่นๆ',ot]);
+var pal=[a1,a2,'#4f7cac','#c9a227','#8a5fb3','#6aa84f','#8a959b'];
+mk('#c2',{type:'doughnut',data:{labels:top.map(function(x){return x[0]}),datasets:[{data:top.map(function(x){return x[1]}),backgroundColor:pal,borderWidth:0}]},options:{cutout:'58%',plugins:{legend:{position:'bottom'}}}});
+if(C.date){var D={};rs.forEach(function(r){if(r[C.date] instanceof Date){var q=r[C.date].toISOString().slice(0,7);(D[q]=D[q]||[]).push(r)}});var K=Object.keys(D).sort();
+mk('#c3',{type:'line',data:{labels:K,datasets:[{label:m,data:K.map(function(q){return agg(D[q],m)}),borderColor:a2,backgroundColor:a2,tension:.3,pointRadius:3}]},options:{plugins:{legend:{display:false}},scales:{y:{ticks:{callback:function(v){return fmt(v,p)}}}}}})}}
+$('#f').onchange=function(e){if(e.target.files[0])load(e.target.files[0])};
+$('#sh').onchange=function(e){pick(e.target.value)};$('#mt').onchange=$('#gp').onchange=draw;
+var dr=$('#drop');dr.ondragover=function(e){e.preventDefault();dr.classList.add('over')};dr.ondragleave=function(){dr.classList.remove('over')};
+dr.ondrop=function(e){e.preventDefault();dr.classList.remove('over');if(e.dataTransfer.files[0])load(e.dataTransfer.files[0])};
+function slides(){return Array.from(document.querySelectorAll('.sec')).filter(function(s){return !s.hidden})}
+function show(i){var S=slides();idx=(i+S.length)%S.length;S.forEach(function(s,j){s.classList.toggle('on',j===idx)});$('#ct').textContent=(idx+1)+' / '+S.length;setTimeout(function(){Object.values(ch).forEach(function(c){c.resize()})},50)}
+function pres(on){document.body.classList.toggle('present',on);$('#nav').hidden=!on;if(on){show(0);try{document.documentElement.requestFullscreen()}catch(e){}}else{slides().forEach(function(s){s.classList.remove('on')});if(document.fullscreenElement)document.exitFullscreen();setTimeout(function(){Object.values(ch).forEach(function(c){c.resize()})},50)}}
+$('#pr').onclick=function(){pres(true)};$('#ex').onclick=function(){pres(false)};$('#pv').onclick=function(){show(idx-1)};$('#nx').onclick=function(){show(idx+1)};
+document.onkeydown=function(e){if(!document.body.classList.contains('present'))return;if(e.key==='ArrowRight'||e.key===' ')show(idx+1);if(e.key==='ArrowLeft')show(idx-1);if(e.key==='Escape')pres(false)};
+</script></body></html>
