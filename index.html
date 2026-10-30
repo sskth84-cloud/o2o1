@@ -9,7 +9,7 @@
 :root{--bg:#eef3f2;--card:#fff;--ink:#14232b;--mut:#5d6b72;--ac:#0b7a75;--ac2:#e0662a;--line:#d6e0de;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1b20;--card:#16262d;--ink:#e8f0ee;--mut:#9fb0b5;--ac:#3cc5bb;--ac2:#ff8a4c;--line:#26393f}}
 :root[data-theme="dark"]{--bg:#0f1b20;--card:#16262d;--ink:#e8f0ee;--mut:#9fb0b5;--ac:#3cc5bb;--ac2:#ff8a4c;--line:#26393f}
-*{box-sizing:border-box}html,body{margin:0}
+[hidden]{display:none!important}*{box-sizing:border-box}html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font-family:'IBM Plex Sans Thai',system-ui,sans-serif;line-height:1.5}
 header{display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line)}
 h1{font-size:22px;margin:0}h2{font-size:18px;margin:0 0 12px}
@@ -56,12 +56,12 @@ var $=function(s){return document.querySelector(s)},wb,rows=[],C={num:[],cat:[],
 function fmt(n,p){if(p)return(n*100).toFixed(1)+'%';var a=Math.abs(n);return a>=1e9?(n/1e9).toFixed(2)+'B':a>=1e6?(n/1e6).toFixed(2)+'M':a>=1e3?(n/1e3).toFixed(1)+'K':String(+n.toFixed(2))}
 function pct(c){return avg[c]&&rows.every(function(r){return typeof r[c]!=='number'||(r[c]>=0&&r[c]<=1)})}
 function load(file){var r=new FileReader();r.onload=function(e){try{wb=XLSX.read(e.target.result,{type:'array',cellDates:true});var s=$('#sh');s.innerHTML='';wb.SheetNames.forEach(function(n){s.add(new Option(n,n))});s.hidden=wb.SheetNames.length<2;$('#fn').textContent=file.name;pick(wb.SheetNames[0])}catch(x){alert('อ่านไฟล์ไม่ได้ กรุณาเลือกไฟล์ .xlsx หรือ .csv')}};r.readAsArrayBuffer(file)}
-function pick(n){rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{defval:null});C={num:[],cat:[],date:null};avg={};fv={};
+function pick(n){rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{defval:null}).filter(function(r){var v=Object.values(r).filter(function(x){return x!==null&&x!==''});return v.length>1&&!v.some(function(x){return /^(grand\s*)?total$|^รวม$/i.test(String(x).trim())})});C={num:[],cat:[],date:null};avg={};fv={};
 if(!rows.length){alert('ชีตนี้ไม่มีข้อมูล');return}
 Object.keys(rows[0]).forEach(function(k){var v=rows.map(function(r){return r[k]}).filter(function(x){return x!==null&&x!==''});if(!v.length)return;
 var nd=v.filter(function(x){return x instanceof Date}).length,nn=v.filter(function(x){return typeof x==='number'}).length;
-if(nd/v.length>.8){if(!C.date)C.date=k}else if(nn/v.length>.8){C.num.push(k);if(/%|rate|otif|ontime|infull|margin|อัตรา/i.test(k)||v.every(function(x){return typeof x!=='number'||(x>=0&&x<=1)}))avg[k]=1}
-else{var d=new Set(v).size;if(d<=40&&d<rows.length*.8)C.cat.push(k)}});
+if(nd/v.length>.8){if(!C.date)C.date=k}else if(nn/v.length>.8){if(new Set(v).size<3)return;C.num.push(k);if(/%|rate|otif|ontime|infull|margin|อัตรา/i.test(k)||v.every(function(x){return typeof x!=='number'||(x>=0&&x<=1)}))avg[k]=1}
+else{var d=new Set(v).size;if(d<=40&&(d<rows.length*.8||rows.length<=60))C.cat.push(k)}});
 if(!C.num.length||!C.cat.length){alert('ไม่พบคอลัมน์ตัวเลขหรือคอลัมน์กลุ่มที่ใช้ทำแดชบอร์ดได้');return}
 $('#drop').hidden=true;$('#app').hidden=false;$('#pr').hidden=false;
 var m=$('#mt'),g=$('#gp'),f=$('#flt');m.innerHTML=g.innerHTML=f.innerHTML='';
