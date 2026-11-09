@@ -1,5 +1,6 @@
 const Redis = require('ioredis');
 const KEY = 'o2o-data';
+const CHUNK = 250000; // ตัวอักษรต่อชิ้น (กันเกินขีดจำกัดขนาดคำสั่งของ Redis ฟรี)
 
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -19,10 +20,26 @@ module.exports = async (req, res) => {
         return res.status(400).json({ error: 'ไม่พบข้อมูลชีต' });
       }
       const updatedAt = new Date().toISOString();
-      await r.set(KEY, JSON.stringify({ updatedAt, fileName: String(b.fileName || ''), sheets: b.sheets }));
-      return res.status(200).json({ ok: true, updatedAt });
+      const val = JSON.stringify({ updatedAt, fileName: String(b.fileName || ''), sheets: b.sheets });
+      const parts = [];
+      for (let i = 0; i < val.length; i += CHUNK) parts.push(val.slice(i, i + CHUNK));
+      const old = parseInt(await r.get(KEY + ':n'), 10) || 0;
+      for (let i = 0; i < parts.length; i++) await r.set(KEY + ':' + i, parts[i]);
+      await r.set(KEY + ':n', String(parts.length));
+      for (let i = parts.length; i < old; i++) await r.del(KEY + ':' + i);
+      await r.del(KEY);
+      return res.status(200).json({ ok: true, updatedAt, parts: parts.length });
     }
-    const v = await r.get(KEY);
+    const n = parseInt(await r.get(KEY + ':n'), 10) || 0;
+    let v = null;
+    if (n > 0) {
+      const keys = [];
+      for (let i = 0; i < n; i++) keys.push(KEY + ':' + i);
+      const got = await r.mget(keys);
+      if (got.every((x) => x != null)) v = got.join('');
+    } else {
+      v = await r.get(KEY);
+    }
     if (!v) return res.status(404).json({ error: 'ยังไม่มีข้อมูลที่อัปโหลด' });
     res.setHeader('Content-Type', 'application/json');
     return res.status(200).send(v);
