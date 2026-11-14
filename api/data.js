@@ -1,6 +1,10 @@
 const Redis = require('ioredis');
 const KEY = 'o2o-data';
 const CHUNK = 250000; // ตัวอักษรต่อชิ้น (กันเกินขีดจำกัดขนาดคำสั่งของ Redis ฟรี)
+const MAX_FAIL = 20;  // ใส่รหัสผิดได้กี่ครั้งต่อ 10 นาที (ต่อ IP)
+
+const sleep = (ms) => new Promise((ok) => setTimeout(ok, ms));
+const safeDecode = (v) => { try { return decodeURIComponent(v); } catch (e) { return v; } };
 
 module.exports = async (req, res) => {
   res.setHeader('Cache-Control', 'no-store');
@@ -30,6 +34,29 @@ module.exports = async (req, res) => {
       await r.del(KEY);
       return res.status(200).json({ ok: true, updatedAt, parts: parts.length });
     }
+
+    // ----- ดูข้อมูล: ถ้าตั้ง VIEW_PASSWORD ไว้ ต้องส่งรหัสมาด้วย -----
+    const viewCodes = (process.env.VIEW_PASSWORD || '').split(',').map((x) => x.trim()).filter(Boolean);
+    if (viewCodes.length) {
+      const code = safeDecode(String(req.headers['x-view-code'] || '')).trim();
+      const ok = !!code && (viewCodes.includes(code) || code === process.env.UPLOAD_PASSWORD);
+      const ip = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
+      const fk = 'o2o-fail:' + ip;
+      const fails = parseInt(await r.get(fk), 10) || 0;
+      if (fails >= MAX_FAIL) {
+        return res.status(429).json({ error: 'ใส่รหัสผิดบ่อยเกินไป กรุณารอ 10 นาที' });
+      }
+      if (!ok) {
+        if (code) {
+          await r.incr(fk);
+          await r.expire(fk, 600);
+          await sleep(600);
+        }
+        return res.status(401).json({ needcode: true, error: 'ต้องใช้รหัสเข้าดู' });
+      }
+      if (fails) await r.del(fk);
+    }
+
     const n = parseInt(await r.get(KEY + ':n'), 10) || 0;
     let v = null;
     if (n > 0) {
