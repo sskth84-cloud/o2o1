@@ -14,6 +14,13 @@ async function setBig(r, key, val) {
   return parts.length;
 }
 
+async function delBig(r, key) {
+  const n = parseInt(await r.get(key + ':n'), 10) || 0;
+  for (let i = 0; i < n; i++) await r.del(key + ':' + i);
+  await r.del(key + ':n');
+  await r.del(key);
+}
+
 async function getBig(r, key) {
   const n = parseInt(await r.get(key + ':n'), 10) || 0;
   if (n > 0) {
@@ -45,6 +52,12 @@ module.exports = async (req, res) => {
         const P = q.k === 'ontime' ? 'o2o-x' : 'o2o-d';
         // ยอดขายประจำวัน (daily) / On-time OrderExport (ontime) แยกที่เก็บกัน: เก็บทีละวัน (days = { 'YYYY-MM-DD': { S, out?, ox?, fx? } })
         if (!b.days || typeof b.days !== 'object') return res.status(400).json({ error: 'ไม่พบข้อมูลรายวัน' });
+        // อัปโหลดไฟล์ใหม่ = ลบข้อมูลเก่าของชุดนี้ทั้งหมดก่อน แล้วเก็บเฉพาะวันที่อยู่ในไฟล์ใหม่
+        for (const od of await r.smembers(P + ':idx')) {
+          await delBig(r, P + ':' + od);
+          await r.del(P + ':m:' + od);
+          await r.srem(P + ':idx', od);
+        }
         const saved = [];
         for (const d of Object.keys(b.days)) {
           if (!DATE.test(d)) continue;
