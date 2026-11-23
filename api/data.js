@@ -41,17 +41,18 @@ module.exports = async (req, res) => {
         return res.status(401).json({ error: 'รหัสผ่านไม่ถูกต้อง' });
       }
       const updatedAt = new Date().toISOString();
-      if (q.k === 'daily') {
-        // ยอดขายประจำวัน: เก็บทีละวัน (days = { 'YYYY-MM-DD': { S, out?, ox?, fx? } })
+      if (q.k === 'daily' || q.k === 'ontime') {
+        const P = q.k === 'ontime' ? 'o2o-x' : 'o2o-d';
+        // ยอดขายประจำวัน (daily) / On-time OrderExport (ontime) แยกที่เก็บกัน: เก็บทีละวัน (days = { 'YYYY-MM-DD': { S, out?, ox?, fx? } })
         if (!b.days || typeof b.days !== 'object') return res.status(400).json({ error: 'ไม่พบข้อมูลรายวัน' });
         const saved = [];
         for (const d of Object.keys(b.days)) {
           if (!DATE.test(d)) continue;
           const rec = b.days[d] || {};
           const S = rec.S || {};
-          await setBig(r, 'o2o-d:' + d, JSON.stringify({ updatedAt, fileName: String(b.fileName || ''), S, out: rec.out, ox: rec.ox, fx: rec.fx }));
-          await r.set('o2o-d:m:' + d, JSON.stringify({ d, o: S.o || 0, cm: S.cm || 0, cx: S.cx || 0, sales: S.sales || 0, col: S.col || 0, updatedAt, fileName: String(b.fileName || ''), names: !!rec.out }));
-          await r.sadd('o2o-d:idx', d);
+          await setBig(r, P + ':' + d, JSON.stringify({ updatedAt, fileName: String(b.fileName || ''), S, out: rec.out, ox: rec.ox, fx: rec.fx }));
+          await r.set(P + ':m:' + d, JSON.stringify({ d, o: S.o || 0, cm: S.cm || 0, cx: S.cx || 0, sales: S.sales || 0, col: S.col || 0, updatedAt, fileName: String(b.fileName || ''), names: !!rec.out }));
+          await r.sadd(P + ':idx', d);
           saved.push(d);
         }
         return res.status(200).json({ ok: true, updatedAt, days: saved });
@@ -62,18 +63,19 @@ module.exports = async (req, res) => {
       const parts = await setBig(r, KEY, JSON.stringify({ updatedAt, fileName: String(b.fileName || ''), sheets: b.sheets }));
       return res.status(200).json({ ok: true, updatedAt, parts });
     }
-    if (q.k === 'daily') {
+    if (q.k === 'daily' || q.k === 'ontime') {
+      const P = q.k === 'ontime' ? 'o2o-x' : 'o2o-d';
       if (q.d) {
         if (!DATE.test(String(q.d))) return res.status(400).json({ error: 'วันที่ไม่ถูกต้อง' });
-        const v = await getBig(r, 'o2o-d:' + q.d);
+        const v = await getBig(r, P + ':' + q.d);
         if (!v) return res.status(404).json({ error: 'ไม่พบข้อมูลวันที่นี้' });
         res.setHeader('Content-Type', 'application/json');
         return res.status(200).send(v);
       }
-      const dates = (await r.smembers('o2o-d:idx')).filter((d) => DATE.test(d)).sort();
+      const dates = (await r.smembers(P + ':idx')).filter((d) => DATE.test(d)).sort();
       const metas = [];
       for (const d of dates) {
-        const m = await r.get('o2o-d:m:' + d);
+        const m = await r.get(P + ':m:' + d);
         if (m) metas.push(JSON.parse(m));
       }
       return res.status(200).json({ days: metas });
