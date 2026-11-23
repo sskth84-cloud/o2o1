@@ -551,11 +551,11 @@ if(fp)c.push(fp);return c.length?'<h3 class="kph">'+t+'</h3><div class="kpg">'+c
 function kpTop(){var h='';var fd=null,fm=null;
 try{var f4=FP[4],sr=f4&&f4.rows.filter(function(r){return isS(r.n)})[0];if(sr){var dd=cmpA(sr.s,f4.tot.s);fd=kpc('First pick',pc(sr.s),dd[1],dd[0])}}catch(e){}
 try{var ta=trend(4);if(ta.length){var vs=ta.map(function(x){return x[1]});fm=kpc('First pick',pc(mean(vs)),'เฉลี่ยรายวัน · '+ta.length+' วัน','')}}catch(e){}
-h+=kpRow('Daily'+(K.d&&K.d.label?' · '+E(K.d.label):''),K.d,fd);h+=kpRow('MTD'+(K.m&&K.m.label?' · '+E(K.m.label):''),K.m,fm);
-var c=[];try{var ks=dyKeys().filter(function(k){return DY.h[k]&&DY.h[k].ot&&DY.h[k].ot.length});if(ks.length){var k=ks[ks.length-1],A=dyOTagg(DY.h[k]);if(A.n)c.push(kpc('On-time จัดส่ง',pc(A.ok/A.n),dyL(k)+' · '+nf(A.ok)+'/'+nf(A.n),otSt(A.ok/A.n)))}}catch(e){}
+h+=kpRow('Daily'+(K.d&&K.d.label?' · '+E(K.d.label):''),K.d,fd);h+=kpRow('MTD'+(K.m&&K.m.label?' · '+E(K.m.label):''),K.m,fm);try{var yo=ky();if(yo){var t=yo.tot;h+='<h3 class="kph">YTD · '+E(yo.label)+'</h3><div class="kpg">'+kpc('OTIF',pc(t.otif),'68 Salaya','')+kpc('OnTime',pc(t.ont),'68 Salaya','')+kpc('InFull',pc(t.inf),'68 Salaya','')+kpc('ยอดขาย',mf(t.s),nf(t.o)+' orders · เฉลี่ย '+mf(t.s/t.n)+'/วัน','')+'</div>'}}catch(e){}
+var c=[];
 try{var o=tsData();if(o){var l=0;o.rows.forEach(function(r){l+=r.ls});c.push(kpc('มูลค่าเสียจากของขาด',mf(l),nf(o.rows.length)+' รายการ · '+E(o.per||''),''))}}catch(e){}
 if(c.length)h+='<h3 class="kph">อื่น ๆ</h3><div class="kpg">'+c.join('')+'</div>';
-return h?h+'<p class="note" style="margin-top:-6px">สีเทียบกับค่าเฉลี่ย Area 5 (▲ เขียว = สูงกว่า, ▼ แดง = ต่ำกว่า) · On-time: ≥95% เขียว, 90–95% เหลือง, &lt;90% แดง</p>':''}
+return h?h+'<p class="note" style="margin-top:-6px">สีเทียบกับค่าเฉลี่ย Area 5 (▲ เขียว = สูงกว่า, ▼ แดง = ต่ำกว่า) · OTIF/OnTime/InFull จากชีต KPI Daily, KPI -mtd และ KPI YTD (YTD ไม่มีค่า Area 5 ให้เทียบ)</p>':''}
 function collapse(h){var p=h.split('<h2>'),o=p[0]+'<div class="tools" style="justify-content:flex-start"><button data-sec="1">ขยายทั้งหมด</button><button data-sec="0">ย่อทั้งหมด</button></div>';for(var i=1;i<p.length;i++){var j=p[i].indexOf('</h2>'),t=p[i].slice(0,j).replace(/<[^>]*>/g,''),b=p[i].slice(j+5);o+='<details class="sec"'+(i<=4?' open':'')+'><summary>'+t+'</summary><div>'+b+'</div></details>'}return o}
 var tOne0=tOne;tOne=function(){var h=tOne0(),i=h.indexOf('</p>')+4;return h.slice(0,i)+kpTop()+collapse(h.slice(i))};
 function dyKp(S){var pn=0,pv=0;Object.keys(S.ch||{}).forEach(function(k){pn+=S.ch[k].pn||0;pv+=S.ch[k].pv||0});var c=[kpc('ค้างเก็บเงิน',mf(pv),nf(pn)+' บิล',pn?'r':'g'),kpc('เก็บเงินแล้ว',mf(S.col),'จาก '+nf(S.cm)+' ออเดอร์สำเร็จ','')];if(S.ot&&S.ot.length){var A=dyOTagg(S);if(A.n){c.push(kpc('On-time',pc(A.ok/A.n),nf(A.ok)+' / '+nf(A.n)+' ออเดอร์',otSt(A.ok/A.n)));c.push(kpc('ส่งเลท',nf(A.la),'ส่งก่อนเกินกำหนด '+nf(A.ea),A.la?'a':'g'))}}return '<div class="kpg">'+c.join('')+'</div>'}
