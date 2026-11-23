@@ -243,12 +243,17 @@ return a.slice(hi+1).map(function(r){var o={};h.forEach(function(k,j){if(k!=='')
 function dySnap(n){var m=String(n||'').match(/-(\d{1,2})-([A-Za-z]+)-(\d{4})--(\d{1,2})-(\d{2})(?:-\d{2})?-([AP]M)/i);if(!m)return null;var mi=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(m[2].slice(0,3).toLowerCase());if(mi<0)return null;var h=+m[4],pm=m[6].toUpperCase()==='PM';if(pm&&h<12)h+=12;if(!pm&&h===12)h=0;return Date.UTC(+m[3],mi,+m[1],h,+m[5])/60000}
 
 var DX={h:{},sel:'',meta:{},src:{},nm:{}};
-function dxLoad(){try{var t=localStorage.getItem('o2o_ontime');DX.h=t?JSON.parse(t):{}}catch(e){DX.h={}}Object.keys(DX.h).forEach(function(k){DX.src[k]='local'});var ks=Object.keys(DX.h).sort();DX.sel=ks.length?ks[ks.length-1]:''}
+function dxLoad(){try{var t=localStorage.getItem('o2o_ontime');DX.h=t?JSON.parse(t):{};Object.keys(DX.h).forEach(function(k){dxNorm(DX.h[k])})}catch(e){DX.h={}}Object.keys(DX.h).forEach(function(k){DX.src[k]='local'});var ks=Object.keys(DX.h).sort();DX.sel=ks.length?ks[ks.length-1]:''}
 function dxSave(){try{var o={};Object.keys(DX.h).forEach(function(k){if(DX.src[k]!=='server')o[k]=DX.h[k]});localStorage.setItem('o2o_ontime',JSON.stringify(o))}catch(e){}}
 function dxKeys(){var m={};Object.keys(DX.h).forEach(function(k){m[k]=1});Object.keys(DX.meta).forEach(function(k){m[k]=1});return Object.keys(m).sort()}
 function dxRow(k){var x=DX.h[k]||DX.meta[k];return{o:x?x.o||0:0}}
+function dxNorm(X){if(!X||X.nz)return X;var ok=function(l){return /^\d{1,2}:00–\d{1,2}:00$/.test(l)},sl=(X.fd&&X.fd.s)||[],x0=0;
+if(X.fc){var n0=X.fc.length;X.fc=X.fc.filter(function(t){return ok(sl[t[4]])});x0=n0-X.fc.length;X.o=X.fc.length;X.cm=X.fc.filter(function(t){return t[0]===0}).length;X.cx=X.fc.filter(function(t){return t[0]===1}).length}
+if(X.mn)X.mn=X.mn.filter(function(t){return ok(sl[t[1]])});
+if(X.ox)X.ox=X.ox.filter(function(r){return ok(r.sl)});if(X.fx)X.fx=X.fx.filter(function(r){return ok(r.sl)});
+if(x0)X.xm=(X.xm||0)+x0;X.nz=1;return X}
 var dxLoading={};
-function dxFetchDay(d){if(dxLoading[d]||!DX.meta[d])return;dxLoading[d]=1;fetch('/api/data?k=ontime&d='+encodeURIComponent(d),{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(j){dxLoading[d]=0;if(!j||!j.S||(DX.src[d]==='local'&&DX.h[d]))return;var X=j.S;X.ox=j.ox||[];X.fx=j.fx||[];DX.h[d]=X;DX.src[d]='server';R()}).catch(function(){dxLoading[d]=0})}
+function dxFetchDay(d){if(dxLoading[d]||!DX.meta[d])return;dxLoading[d]=1;fetch('/api/data?k=ontime&d='+encodeURIComponent(d),{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(j){dxLoading[d]=0;if(!j||!j.S||(DX.src[d]==='local'&&DX.h[d]))return;var X=j.S;X.ox=j.ox||[];X.fx=j.fx||[];DX.h[d]=dxNorm(X);DX.src[d]='server';R()}).catch(function(){dxLoading[d]=0})}
 function dxMetaLoad(){fetch('/api/data?k=ontime',{cache:'no-store'}).then(function(r){return r.ok?r.json():null}).then(function(j){if(!j||!j.days)return;j.days.forEach(function(m){DX.meta[m.d]=m});var ks=dxKeys();if(!DX.sel||ks.indexOf(DX.sel)<0)DX.sel=ks[ks.length-1]||'';R()}).catch(function(){})}
 function dxShare(days,fn){var pw=prompt('รหัสอัปโหลด เพื่อให้ทุกคนเห็นข้อมูล On-time นี้\n⚠ ข้อมูลเก่าบนเซิร์ฟเวอร์จะถูกลบทั้งหมด แทนที่ด้วยไฟล์นี้\n(กด ยกเลิก = ดูเฉพาะเครื่องนี้ ข้อมูลเก่าบนเซิร์ฟเวอร์ยังอยู่)');if(!pw)return;
 var nm=confirm('แชร์รายชื่อลูกค้า/เลขออเดอร์ (ส่งเลท, ยังส่งไม่เสร็จ) ให้ทุกคนที่เปิดรายงานเห็นด้วยหรือไม่?\nตกลง = แชร์รายชื่อด้วย\nยกเลิก = แชร์เฉพาะตัวเลขสรุป'),body={password:pw,fileName:fn,days:{}};
