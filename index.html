@@ -550,7 +550,7 @@ c.push(kpc('OTIF',pc(s.otif),a[1],a[0]));c.push(kpc('OnTime',pc(s.ont),b[1],b[0]
 if(nd&&s)c.push(kpc('เฉลี่ยต่อวัน',mf(s.amt/nd),nf(s.ord/nd)+' orders/วัน · '+nf(nd)+' วัน',''));if(fp)c.push(fp);return c.length?'<h3 class="kph">'+t+'</h3><div class="kpg">'+c.join('')+'</div>':''}
 function kpTop(){var h='';var fd=null,fm=null;
 try{var f4=FP[4],sr=f4&&f4.rows.filter(function(r){return isS(r.n)})[0];if(sr){var dd=cmpA(sr.s,f4.tot.s);fd=kpc('First pick',pc(sr.s),dd[1],dd[0])}}catch(e){}
-try{var ta=trend(4);if(ta.length){var vs=ta.map(function(x){return x[1]});fm=kpc('First pick',pc(mean(vs)),'เฉลี่ยรายวัน · '+ta.length+' วัน','')}}catch(e){}
+
 h+=kpRow('Daily'+(K.d&&K.d.label?' · '+E(K.d.label):''),K.d,fd);h+=kpRow('MTD'+(K.m&&K.m.label?' · '+E(K.m.label):''),K.m,fm,K.m&&K.m.days);try{var yo=ky();if(yo){var t=yo.tot;h+='<h3 class="kph">YTD · '+E(yo.label)+'</h3><div class="kpg">'+kpc('OTIF',pc(t.otif),'68 Salaya','')+kpc('OnTime',pc(t.ont),'68 Salaya','')+kpc('InFull',pc(t.inf),'68 Salaya','')+kpc('ยอดขาย',mf(t.s),nf(t.o)+' orders','')+kpc('เฉลี่ยต่อวัน',mf(t.s/t.n),nf(t.o/t.n)+' orders/วัน · '+nf(t.n)+' วัน','')+'</div>'}}catch(e){}
 var c=[];
 try{var o=tsData();if(o){var l=0;o.rows.forEach(function(r){l+=r.ls});var oc=0;o.rows.forEach(function(r){oc+=r.oc});c.push(kpc('มูลค่าเสียจากของขาด',mf(l),nf(o.rows.length)+' รายการ · '+E(o.per||''),''));if(o.days)c.push(kpc('มูลค่าเสียเฉลี่ยต่อวัน',mf(l/o.days),nf(oc/o.days)+' ออเดอร์ที่ขาด/วัน · '+o.days+' วัน',''))}}catch(e){}
