@@ -51,7 +51,7 @@ module.exports = async (req, res) => {
       if (q.k === 'oos') {
         // OOS Export (Close by CN): เก็บชุดเดียว อัปโหลดใหม่ = แทนที่ทั้งหมด
         if (!Array.isArray(b.rows)) return res.status(400).json({ error: 'ไม่พบข้อมูล OOS' });
-        await setBig(r, 'o2o-o', JSON.stringify({ updatedAt, fileName: String(b.fileName || ''), snap: String(b.snap || ''), rows: b.rows }));
+        await setBig(r, 'o2o-o', JSON.stringify({ updatedAt, fileName: String(b.fileName || ''), snap: String(b.snap || ''), rows: b.rows, names: b.names && typeof b.names === 'object' ? b.names : {} }));
         return res.status(200).json({ ok: true, updatedAt, n: b.rows.length });
       }
       if (q.k === 'daily' || q.k === 'ontime') {
