@@ -56,9 +56,15 @@ module.exports = async (req, res) => {
       }
       if (q.k === 'drv') {
         // Productivity คนขับ: สะสมแยกตามวันส่งจริง รวมตามเลขออเดอร์ (ไฟล์ Realtime ไม่ทับข้อมูลเดิม) เก็บ 62 วัน
-        if (!b.days || typeof b.days !== 'object') return res.status(400).json({ error: 'ไม่พบข้อมูลคนขับ' });
         let cur = {};
         try { const v = await getBig(r, 'o2o-v'); if (v) cur = JSON.parse(v).days || {}; } catch (e) { cur = {}; }
+        if (b.all === true || Array.isArray(b.del)) {
+          if (b.all === true) cur = {}; else b.del.forEach((d) => { delete cur[String(d)]; });
+          if (!Object.keys(cur).length) await delBig(r, 'o2o-v');
+          else await setBig(r, 'o2o-v', JSON.stringify({ updatedAt, fileName: '', days: cur }));
+          return res.status(200).json({ ok: true, updatedAt, n: Object.keys(cur).length });
+        }
+        if (!b.days || typeof b.days !== 'object') return res.status(400).json({ error: 'ไม่พบข้อมูลคนขับ' });
         for (const d of Object.keys(b.days)) {
           if (!DATE.test(d) || !b.days[d] || typeof b.days[d] !== 'object') continue;
           const m = cur[d] || (cur[d] = {});
@@ -98,21 +104,37 @@ module.exports = async (req, res) => {
       if (q.k === 'daily' || q.k === 'ontime') {
         const P = q.k === 'ontime' ? 'o2o-x' : 'o2o-d';
         // ยอดขายประจำวัน (daily) / On-time OrderExport (ontime) แยกที่เก็บกัน: เก็บทีละวัน (days = { 'YYYY-MM-DD': { S, out?, ox?, fx? } })
+        // ลบวัน: del = ['YYYY-MM-DD', ...] หรือ all = true (ลบทั้งชุด)
+        if (b.all === true || Array.isArray(b.del)) {
+          const dl = b.all === true ? await r.smembers(P + ':idx') : b.del.map(String).filter((x) => DATE.test(x));
+          for (const od of dl) {
+            await delBig(r, P + ':' + od);
+            await r.del(P + ':m:' + od);
+            await r.srem(P + ':idx', od);
+          }
+          return res.status(200).json({ ok: true, updatedAt, deleted: dl });
+        }
         if (!b.days || typeof b.days !== 'object') return res.status(400).json({ error: 'ไม่พบข้อมูลรายวัน' });
-        // อัปโหลดไฟล์ใหม่ = ลบข้อมูลเก่าของชุดนี้ทั้งหมดก่อน แล้วเก็บเฉพาะวันที่อยู่ในไฟล์ใหม่
-        // add=true: ส่วนที่ 2 เป็นต้นไปของการอัปโหลดแบบแบ่งส่ง (ไม่ลบข้อมูลที่ส่งมาก่อนหน้า)
-        if (b.add !== true) {
+        // อัปโหลดไฟล์ใหม่ = รวมเข้ากับข้อมูลเดิมตามวัน (วันซ้ำ: เก็บชุดที่มีออเดอร์มากกว่า ไม่ให้ไฟล์ที่ยังไม่ครบมาทับของที่ครบแล้ว)
+        // replace=true: ลบข้อมูลเก่าทั้งหมดก่อน (ไม่ใช้ในหน้ารายงานตอนนี้)
+        if (b.replace === true && b.add !== true) {
           for (const od of await r.smembers(P + ':idx')) {
             await delBig(r, P + ':' + od);
             await r.del(P + ':m:' + od);
             await r.srem(P + ':idx', od);
           }
         }
-        const saved = [];
+        const saved = [], skipped = [];
         for (const d of Object.keys(b.days)) {
           if (!DATE.test(d)) continue;
           const rec = b.days[d] || {};
           const S = rec.S || {};
+          if (b.replace !== true) {
+            try {
+              const em = JSON.parse(await r.get(P + ':m:' + d) || 'null');
+              if (em && Number(em.o) > Number(S.o || 0)) { skipped.push(d); continue; }
+            } catch (e) { /* ไม่มีข้อมูลเดิม */ }
+          }
           await setBig(r, P + ':' + d, JSON.stringify({ updatedAt, fileName: String(b.fileName || ''), S, out: rec.out, ox: rec.ox, fx: rec.fx }));
           const pdl = Array.isArray(S.pd) ? S.pd : [];
           let pv = 0;
@@ -121,7 +143,7 @@ module.exports = async (req, res) => {
           await r.sadd(P + ':idx', d);
           saved.push(d);
         }
-        return res.status(200).json({ ok: true, updatedAt, days: saved });
+        return res.status(200).json({ ok: true, updatedAt, days: saved, skipped });
       }
       if (!b.sheets || typeof b.sheets !== 'object') {
         return res.status(400).json({ error: 'ไม่พบข้อมูลชีต' });
