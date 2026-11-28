@@ -57,9 +57,16 @@ module.exports = async (req, res) => {
       if (q.k === 'prod' || q.k === 'prodrt') {
         const PK = q.k === 'prodrt' ? 'o2o-pr' : 'o2o-p';
         // Productivity รายบุคคล (ไม่มีคอลัมน์เงิน): รวมตามวันที่ เก็บ 62 วันล่าสุด
-        if (!b.days || typeof b.days !== 'object') return res.status(400).json({ error: 'ไม่พบข้อมูล Productivity' });
         let cur = {};
         try { const v = await getBig(r, PK); if (v) cur = JSON.parse(v).days || {}; } catch (e) { cur = {}; }
+        if (b.all === true || Array.isArray(b.del)) {
+          if (b.all === true) cur = {}; else b.del.forEach(d => { delete cur[String(d)]; });
+          if (!Object.keys(cur).length) await delBig(r, PK);
+          else await setBig(r, PK, JSON.stringify({ updatedAt, fileName: '', days: cur }));
+          return res.status(200).json({ ok: true, updatedAt, n: Object.keys(cur).length });
+        }
+        if (!b.days || typeof b.days !== 'object') return res.status(400).json({ error: 'ไม่พบข้อมูล Productivity' });
+        if (b.replace === true) cur = {};
         for (const d of Object.keys(b.days)) {
           if (!DATE.test(d) || !Array.isArray(b.days[d])) continue;
           cur[d] = b.days[d].slice(0, 500).map(a => Array.isArray(a) ? a.slice(0, 10) : []);
