@@ -143,6 +143,13 @@ module.exports = async (req, res) => {
           await r.sadd(P + ':idx', d);
           saved.push(d);
         }
+        // เก็บย้อนหลังสูงสุด 62 วัน: ตัดวันเก่าที่เกินออก
+        const all = (await r.smembers(P + ':idx')).sort();
+        for (const od of all.slice(0, Math.max(0, all.length - 62))) {
+          await delBig(r, P + ':' + od);
+          await r.del(P + ':m:' + od);
+          await r.srem(P + ':idx', od);
+        }
         return res.status(200).json({ ok: true, updatedAt, days: saved, skipped });
       }
       if (!b.sheets || typeof b.sheets !== 'object') {
