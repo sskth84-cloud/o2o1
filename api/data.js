@@ -54,6 +54,21 @@ module.exports = async (req, res) => {
         await setBig(r, 'o2o-o', JSON.stringify({ updatedAt, fileName: String(b.fileName || ''), snap: String(b.snap || ''), rows: b.rows, names: b.names && typeof b.names === 'object' ? b.names : {} }));
         return res.status(200).json({ ok: true, updatedAt, n: b.rows.length });
       }
+      if (q.k === 'prod' || q.k === 'prodrt') {
+        const PK = q.k === 'prodrt' ? 'o2o-pr' : 'o2o-p';
+        // Productivity รายบุคคล (ไม่มีคอลัมน์เงิน): รวมตามวันที่ เก็บ 62 วันล่าสุด
+        if (!b.days || typeof b.days !== 'object') return res.status(400).json({ error: 'ไม่พบข้อมูล Productivity' });
+        let cur = {};
+        try { const v = await getBig(r, PK); if (v) cur = JSON.parse(v).days || {}; } catch (e) { cur = {}; }
+        for (const d of Object.keys(b.days)) {
+          if (!DATE.test(d) || !Array.isArray(b.days[d])) continue;
+          cur[d] = b.days[d].slice(0, 500).map(a => Array.isArray(a) ? a.slice(0, 10) : []);
+        }
+        const keep = Object.keys(cur).sort().slice(-62), out = {};
+        keep.forEach(k => { out[k] = cur[k]; });
+        await setBig(r, PK, JSON.stringify({ updatedAt, fileName: String(b.fileName || ''), days: out }));
+        return res.status(200).json({ ok: true, updatedAt, n: keep.length });
+      }
       if (q.k === 'daily' || q.k === 'ontime') {
         const P = q.k === 'ontime' ? 'o2o-x' : 'o2o-d';
         // ยอดขายประจำวัน (daily) / On-time OrderExport (ontime) แยกที่เก็บกัน: เก็บทีละวัน (days = { 'YYYY-MM-DD': { S, out?, ox?, fx? } })
@@ -91,6 +106,12 @@ module.exports = async (req, res) => {
     if (q.k === 'oos') {
       const v = await getBig(r, 'o2o-o');
       if (!v) return res.status(404).json({ error: 'ยังไม่มีข้อมูล OOS' });
+      res.setHeader('Content-Type', 'application/json');
+      return res.status(200).send(v);
+    }
+    if (q.k === 'prod' || q.k === 'prodrt') {
+      const v = await getBig(r, q.k === 'prodrt' ? 'o2o-pr' : 'o2o-p');
+      if (!v) return res.status(404).json({ error: 'ยังไม่มีข้อมูล' });
       res.setHeader('Content-Type', 'application/json');
       return res.status(200).send(v);
     }
