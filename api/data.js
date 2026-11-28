@@ -54,6 +54,24 @@ module.exports = async (req, res) => {
         await setBig(r, 'o2o-o', JSON.stringify({ updatedAt, fileName: String(b.fileName || ''), snap: String(b.snap || ''), rows: b.rows, names: b.names && typeof b.names === 'object' ? b.names : {} }));
         return res.status(200).json({ ok: true, updatedAt, n: b.rows.length });
       }
+      if (q.k === 'drv') {
+        // Productivity คนขับ: สะสมแยกตามวันส่งจริง รวมตามเลขออเดอร์ (ไฟล์ Realtime ไม่ทับข้อมูลเดิม) เก็บ 62 วัน
+        if (!b.days || typeof b.days !== 'object') return res.status(400).json({ error: 'ไม่พบข้อมูลคนขับ' });
+        let cur = {};
+        try { const v = await getBig(r, 'o2o-v'); if (v) cur = JSON.parse(v).days || {}; } catch (e) { cur = {}; }
+        for (const d of Object.keys(b.days)) {
+          if (!DATE.test(d) || !b.days[d] || typeof b.days[d] !== 'object') continue;
+          const m = cur[d] || (cur[d] = {});
+          for (const od of Object.keys(b.days[d]).slice(0, 3000)) {
+            const a = b.days[d][od];
+            if (Array.isArray(a)) m[String(od).slice(0, 40)] = a.slice(0, 4);
+          }
+        }
+        const keep = Object.keys(cur).sort().slice(-62), out = {};
+        keep.forEach(k => { out[k] = cur[k]; });
+        await setBig(r, 'o2o-v', JSON.stringify({ updatedAt, fileName: String(b.fileName || ''), days: out }));
+        return res.status(200).json({ ok: true, updatedAt, n: keep.length });
+      }
       if (q.k === 'prod' || q.k === 'prodrt') {
         const PK = q.k === 'prodrt' ? 'o2o-pr' : 'o2o-p';
         // Productivity รายบุคคล (ไม่มีคอลัมน์เงิน): รวมตามวันที่ เก็บ 62 วันล่าสุด
@@ -69,7 +87,8 @@ module.exports = async (req, res) => {
         if (b.replace === true) cur = {};
         for (const d of Object.keys(b.days)) {
           if (!DATE.test(d) || !Array.isArray(b.days[d])) continue;
-          cur[d] = b.days[d].slice(0, 500).map(a => Array.isArray(a) ? a.slice(0, 10) : []);
+          const nw = b.days[d].slice(0, 500).map(a => Array.isArray(a) ? a.slice(0, 10) : []);
+          cur[d] = nw;
         }
         const keep = Object.keys(cur).sort().slice(-62), out = {};
         keep.forEach(k => { out[k] = cur[k]; });
@@ -113,6 +132,12 @@ module.exports = async (req, res) => {
     if (q.k === 'oos') {
       const v = await getBig(r, 'o2o-o');
       if (!v) return res.status(404).json({ error: 'ยังไม่มีข้อมูล OOS' });
+      res.setHeader('Content-Type', 'application/json');
+      return res.status(200).send(v);
+    }
+    if (q.k === 'drv') {
+      const v = await getBig(r, 'o2o-v');
+      if (!v) return res.status(404).json({ error: 'ยังไม่มีข้อมูล' });
       res.setHeader('Content-Type', 'application/json');
       return res.status(200).send(v);
     }
