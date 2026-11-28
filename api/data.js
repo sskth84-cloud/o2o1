@@ -59,10 +59,13 @@ module.exports = async (req, res) => {
         // ยอดขายประจำวัน (daily) / On-time OrderExport (ontime) แยกที่เก็บกัน: เก็บทีละวัน (days = { 'YYYY-MM-DD': { S, out?, ox?, fx? } })
         if (!b.days || typeof b.days !== 'object') return res.status(400).json({ error: 'ไม่พบข้อมูลรายวัน' });
         // อัปโหลดไฟล์ใหม่ = ลบข้อมูลเก่าของชุดนี้ทั้งหมดก่อน แล้วเก็บเฉพาะวันที่อยู่ในไฟล์ใหม่
-        for (const od of await r.smembers(P + ':idx')) {
-          await delBig(r, P + ':' + od);
-          await r.del(P + ':m:' + od);
-          await r.srem(P + ':idx', od);
+        // add=true: ส่วนที่ 2 เป็นต้นไปของการอัปโหลดแบบแบ่งส่ง (ไม่ลบข้อมูลที่ส่งมาก่อนหน้า)
+        if (b.add !== true) {
+          for (const od of await r.smembers(P + ':idx')) {
+            await delBig(r, P + ':' + od);
+            await r.del(P + ':m:' + od);
+            await r.srem(P + ':idx', od);
+          }
         }
         const saved = [];
         for (const d of Object.keys(b.days)) {
@@ -70,7 +73,10 @@ module.exports = async (req, res) => {
           const rec = b.days[d] || {};
           const S = rec.S || {};
           await setBig(r, P + ':' + d, JSON.stringify({ updatedAt, fileName: String(b.fileName || ''), S, out: rec.out, ox: rec.ox, fx: rec.fx }));
-          await r.set(P + ':m:' + d, JSON.stringify({ d, o: S.o || 0, cm: S.cm || 0, cx: S.cx || 0, sales: S.sales || 0, col: S.col || 0, updatedAt, fileName: String(b.fileName || ''), names: !!rec.out }));
+          const pdl = Array.isArray(S.pd) ? S.pd : [];
+          let pv = 0;
+          for (const x of pdl) pv += Number(x && x.ou) || 0;
+          await r.set(P + ':m:' + d, JSON.stringify({ d, o: S.o || 0, cm: S.cm || 0, cx: S.cx || 0, sales: S.sales || 0, col: S.col || 0, pn: pdl.length, pv: Math.round(pv), updatedAt, fileName: String(b.fileName || ''), names: !!rec.out }));
           await r.sadd(P + ':idx', d);
           saved.push(d);
         }
